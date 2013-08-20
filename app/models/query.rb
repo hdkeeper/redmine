@@ -116,7 +116,8 @@ class Query < ActiveRecord::Base
                   "<t-" => :label_more_than_ago,
                   "t-"  => :label_ago,
                   "~"   => :label_contains,
-                  "!~"  => :label_not_contains }
+                  "!~"  => :label_not_contains,
+                  "odc" => :label_open_done_closed }
 
   cattr_reader :operators
 
@@ -125,7 +126,7 @@ class Query < ActiveRecord::Base
                                  :list_optional => [ "=", "!", "!*", "*" ],
                                  :list_subprojects => [ "*", "!*", "=" ],
                                  :date => [ "=", ">=", "<=", "><", "<t+", ">t+", "t+", "t", "w", ">t-", "<t-", "t-", "!*", "*" ],
-                                 :date_past => [ "=", ">=", "<=", "><", ">t-", "<t-", "t-", "t", "w", "!*", "*" ],
+                                 :date_past => [ "=", ">=", "<=", "><", ">t-", "<t-", "t-", "t", "w", "!*", "*", "odc" ],
                                  :string => [ "=", "~", "!", "!~", "!*", "*" ],
                                  :text => [  "~", "!~", "!*", "*" ],
                                  :integer => [ "=", ">=", "<=", "><", "!*", "*" ],
@@ -805,6 +806,17 @@ class Query < ActiveRecord::Base
       sql = "LOWER(#{db_table}.#{db_field}) LIKE '%#{connection.quote_string(value.first.to_s.downcase)}%'"
     when "!~"
       sql = "LOWER(#{db_table}.#{db_field}) NOT LIKE '%#{connection.quote_string(value.first.to_s.downcase)}%'"
+    when "odc"
+      # День, предшествующий заданному (Д-1)
+      date1 = (Date.parse(value.first) - 1 rescue nil)
+      updated_sql = date_clause( db_table, db_field, date1, date1)
+        
+      # Открытые задачи, в которых исполнение стоит < 100%
+      sql = "( #{Issue.table_name}.status_id IN (SELECT id FROM #{IssueStatus.table_name} WHERE is_closed=#{connection.quoted_false}) AND #{Issue.table_name}.done_ratio < 100 )"
+      # ИЛИ открытые задачи, в которых исполнение стоит = 100% и она была обновлена Д-1 день
+      sql << " OR ( #{Issue.table_name}.status_id IN (SELECT id FROM #{IssueStatus.table_name} WHERE is_closed=#{connection.quoted_false}) AND #{Issue.table_name}.done_ratio = 100 AND #{updated_sql} )"
+      # ИЛИ закрытые задачи, которые обновились Д-1 день
+      sql << " OR ( #{Issue.table_name}.status_id IN (SELECT id FROM #{IssueStatus.table_name} WHERE is_closed=#{connection.quoted_true}) AND #{updated_sql} )"
     else
       raise "Unknown query operator #{operator}"
     end

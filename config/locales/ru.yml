@@ -601,6 +601,7 @@ ru:
   label_none: отсутствует
   label_not_contains: не содержит
   label_not_equals: не является
+  label_open_done_closed: открыто, сделано или закрыто
   label_open_issues: открыто
   label_open_issues_plural: открыто
   label_open_issues_plural2: открыто
