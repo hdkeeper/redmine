@@ -809,7 +809,8 @@ class Query < ActiveRecord::Base
     when "odc"
       # День, предшествующий заданному (Д-1)
       date1 = (Date.parse(value.first) - 1 rescue nil)
-      updated_sql = date_clause( db_table, db_field, date1, date1)
+      updated_sql = date_clause( db_table, "updated_on", date1, date1)
+      created_sql = date_clause( db_table, "created_on", date1, date1)
         
       # Открытые задачи, в которых исполнение стоит < 100%
       sql = "( #{Issue.table_name}.status_id IN (SELECT id FROM #{IssueStatus.table_name} WHERE is_closed=#{connection.quoted_false}) AND #{Issue.table_name}.done_ratio < 100 )"
@@ -817,6 +818,8 @@ class Query < ActiveRecord::Base
       sql << " OR ( #{Issue.table_name}.status_id IN (SELECT id FROM #{IssueStatus.table_name} WHERE is_closed=#{connection.quoted_false}) AND #{Issue.table_name}.done_ratio = 100 AND #{updated_sql} )"
       # ИЛИ закрытые задачи, которые обновились Д-1 день
       sql << " OR ( #{Issue.table_name}.status_id IN (SELECT id FROM #{IssueStatus.table_name} WHERE is_closed=#{connection.quoted_true}) AND #{updated_sql} )"
+      # ИЛИ задачи, созданные Д-1 день
+      sql << " OR ( #{created_sql} )"
     else
       raise "Unknown query operator #{operator}"
     end
